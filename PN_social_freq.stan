@@ -12,7 +12,7 @@ data {
     int N_effects;      #// number of learning parameters to estimate
 }
 parameters {
-    real<lower=0> lambda;                   #// mutlinomial error parameter
+    real<lower=0> lambda;                   #// sensitivity to individual payoffs
     vector[N_effects] mu;                   #// average effects
     matrix[N_effects,J] zed;                #// individual z-scores
     cholesky_factor_corr[N_effects] L_Rho;  #// correlation matrix
