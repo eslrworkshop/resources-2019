@@ -83,7 +83,7 @@ d1$press <- d1$press / max(d1$press)
 ##################################################################
 
 ###########main effects posterior graphs##################
-cairo_pdf("Main_effects_postgraphs.pdf",height=8,width=8)
+pdf("Main_effects_postgraphs.pdf",height=8,width=8)
 par(mfrow=c(3,3), oma = c(0, 0, 0, 0) , mar=c(3,.5,2,.5))
 par(cex = 0.6)
 par(tcl = -0.25)
@@ -136,24 +136,6 @@ shade( density(post$lambda) , lim= HPDI(as.vector(post$lambda), prob=0.9999) , c
 curve( dexp( x , rate=1) , lty=2 , add=TRUE , col="black" )
 
 dev.off()
-
-##########estimates of sigma graph########################
-cairo_pdf("varef_sigma.pdf",height=4,width=7.5)
-
-col.sig <- c("cornflowerblue","cornflowerblue","red", "orange" , "orange", "orange" , "orange" , "orange" )
-par(mfrow=c(2,4), oma = c(0, 0, 0, 0) , mar=c(3,.5,2,.5))
-par(cex = 0.6)
-par(tcl = -0.25)
-par(mgp = c(2, 0.6, 0))
-lab.name <- c("\u03A6","\u03B3","\u0192c" , "\u03B2pay" , "\u03B2kin" , "\u03B2rank" , "\u03B2coho" , "\u03B2age")
-for (i in 1:8){
-    dens(post$sigma[,i] , xlim=c(0,4) ,  col="white", yaxt='n'  , main= bquote( sigma [.(lab.name[i])])  )
-    curve( dexp( x , rate=3) , lty=2 , add=TRUE , col=col.sig[i] )
-    shade( density(post$sigma[,i]) , lim= HPDI(as.vector(post$sigma[,i]), prob=0.999) , col = col.alpha(col.sig[i], 0.25) )
-}
-dev.off()
-
-
 
 ##########################phi age effects graph################
 
@@ -287,8 +269,8 @@ for ( i in 1:max(d1$N) ) {
 
 
 
-col_index= c("darkgreen","blue","red","gold","grey","violet","orange")
-
+#col_index= c("darkgreen","blue","red","gold","grey","violet","orange")
+col_index= c("#1B9E77", "#D95F02" ,"#7570B3", "#E7298A" ,"#66A61E", "#E6AB02" ,"#A6761D")
 d$date_index <- as.integer(as.factor(d$date_index))
 matF <- matrix(, nrow = 75, ncol = 8)
 matP <- matrix(, nrow = 75, ncol = 8)
