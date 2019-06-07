@@ -7,7 +7,7 @@
 # Then the simulation can be run with:
 #       result <- sim_rogers2()
 # Add arguments to change the simulation parameters. For example:
-#       result <- sim_rogers2( migration_rate=0 )
+#   result <- sim_rogers2( migration_rate=0 )
 
 # The result contains an array with the history of the population.
 # The structure is:
@@ -137,6 +137,6 @@ sim_plot <- function( x ) {
   lines( 1:n , x[,2] , col="orange" )
   lines( 1:n , x[,3] , col="green" )
   lines( 1:n , x[,4] , col="blue" , lty=2 )
-  legend("right", inset=c(-0.21,0), legend=c("Individual Learn.","Social Lear.", "Conformist Lear.", "Adapted agents"), 
+  legend("right", inset=c(-0.21,0), legend=c("Individual Learn.","Social Learn.", "Conformist Learn.", "Adapted agents"), 
          col=c("black", "orange", "green", "blue"),lty=c(1,1,1,2), title = "Proportion", cex = 0.8)
 }
