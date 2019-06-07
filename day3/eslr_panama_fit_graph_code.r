@@ -7,12 +7,13 @@ require("repmis") #to read rdata files from github
 require("RCurl") #to read csv's from github
 
 #load simplified posterior samples from GitHub
-source_data("https://github.com/bjbarrett/resources-2019/blob/barretteslr2019/eslr_pn_posterior.Rdata?raw=True")
+source_data("https://github.com/eslrworkshop/resources-2019/blob/master/day3/eslr_pn_posterior.Rdata?raw=True")
+
 
 #load data from github
-d  <- read.csv(text=getURL("https://raw.githubusercontent.com/bjbarrett/resources-2019/master/panama_data_14days.csv"), header=T)
-mono_index_all  <- read.csv(text=getURL("https://raw.githubusercontent.com/bjbarrett/resources-2019/master/mono_indexing_all.csv"), header=T)
-mono_index_subset  <- read.csv(text=getURL("https://raw.githubusercontent.com/bjbarrett/resources-2019/master/mono_indexing.csv"), header=T)
+d  <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/panama_data_14days.csv"), header=T)
+mono_index_all  <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/mono_indexing_all.csv"), header=T)
+mono_index_subset  <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/mono_indexing.csv"), header=T)
 
 
 ###Below is code to load locally if internet ist kaputt
@@ -146,7 +147,7 @@ for(i in 1:23){varefphi[i] <- mean(vfphi[,i])}
 
 rando.samps <- sample(1:nrow(post$lambda), size=100, replace = FALSE, prob = NULL)
      
-cairo_pdf("phi_age_varef.pdf", width=8 , height=8)
+pdf("phi_age_varef.pdf", width=8 , height=8)
 par(mar=c(5,5,0.5,0.5))
 plot(varefphi~ ages$age.c , ylab="attraction toward new experience (\u0278)" , xlab="age (years)" , pch=19 , col="orange" ,xlim=c( (min(ages$age.c)-1) , (max(ages$age.c) + 2)), ylim=c(0,.6) , cex=1.5 , cex.lab=2.4  , xaxt="n" , yaxt="n" , axes=FALSE)
 
@@ -179,7 +180,7 @@ for(i in 1:23){vfgamma[,i] <- logistic(post$mu[,2] + post$a_id[,i,2] + post$b_ag
 for(i in 1:23){varefgamma[i] <- mean(vfgamma[,i])}
 lines(age.seq , pred.mean , lw=2)
 
-cairo_pdf("gamma_age_varef.pdf", width=8 , height=8)
+pdf("gamma_age_varef.pdf", width=8 , height=8)
 par(mar=c(5,5,0.5,0.5))
 plot(varefgamma~ ages$age.c , ylab="weight given to social information (\u03B3)" , xlab="age (years)" , pch=19 , col="cornflowerblue" ,xlim=c( (min(ages$age.c)-1) , (max(ages$age.c) + 2)), ylim=c(0,.6) , cex=1.7 , cex.lab=2.4  , xaxt="n" , yaxt="n" , axes=FALSE )
 axis(1, at = seq(from=(min(ages$age.c)-1) , to=(max(ages$age.c) + 2), by = 5) , labels=seq(from=0 , to=25 , by=5), tck=-0.02, cex.axis=1.5)
