@@ -1,20 +1,152 @@
 ##################################################################
 #######prepare required packages and data files###################
 ##################################################################
-
-library(rethinking)
+#library(rethinking)
 require("repmis") #to read rdata files from github
 require("RCurl") #to read csv's from github
+col_index= c("#1B9E77", "#D95F02" ,"#7570B3", "#E7298A" ,"#66A61E", "#E6AB02" ,"#A6761D")
 
-#load simplified posterior samples from GitHub
-source_data("https://github.com/eslrworkshop/resources-2019/blob/master/day3/eslr_pn_posterior.Rdata?raw=True")
+#######################################################
+######set color pallete and load functions#############
+#######################################################
+#softmax function to simplify code
+Softmax <- function(x){
+exp(x)/sum(exp(x))
+} 
 
+logit <- function(p){ 
+    (log(p/(1-p)))
+}
+
+logistic <- function(x){ 
+    (1/(1+exp(-x)))
+}
+
+#######add convenient density ploting function, ahade, col.alpha, concat, and HPDI code lifted from rethinking by McElreath
+dens <- function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE, 
+    show.zero = FALSE, rm.na = TRUE, add = FALSE, ...) 
+{
+    if (inherits(x, "data.frame")) {
+        n <- ncol(x)
+        cnames <- colnames(x)
+        set_nice_margins()
+        par(mfrow = make.grid(n))
+        for (i in 1:n) {
+            dens(x[, i], adj = adj, norm.comp = norm.comp, show.HPDI = show.HPDI, 
+                show.zero = TRUE, xlab = cnames[i], ...)
+        }
+    }
+    else {
+        if (rm.na == TRUE) 
+            x <- x[!is.na(x)]
+        thed <- density(x, adjust = adj)
+        if (add == FALSE) {
+            set_nice_margins()
+            plot(thed, main = main, ...)
+        }
+        else lines(thed$x, thed$y, ...)
+        if (show.HPDI != FALSE) {
+            hpd <- HPDI(x, prob = show.HPDI)
+            shade(thed, hpd)
+        }
+        if (norm.comp == TRUE) {
+            mu <- mean(x)
+            sigma <- sd(x)
+            curve(dnorm(x, mu, sigma), col = "white", lwd = 2, 
+                add = TRUE)
+            curve(dnorm(x, mu, sigma), add = TRUE)
+        }
+        if (show.zero == TRUE) {
+            lines(c(0, 0), c(0, max(thed$y) * 2), lty = 2)
+        }
+    }
+}
+
+set_nice_margins <- function () {
+    par_mf <- par("mfrow", "mfcol")
+    if (all(unlist(par_mf) == 1)) {
+        par(mgp = c(1.5, 0.5, 0), mar = c(2.5, 2.5, 2, 1) + 0.1, 
+            tck = -0.02)
+    }
+}
+
+col.alpha <- function (acol, alpha = 0.2) {
+    acol <- col2rgb(acol)
+    acol <- rgb(acol[1]/255, acol[2]/255, acol[3]/255, alpha)
+    acol
+}
+
+shade <- function (object, lim, label = NULL, col = col.alpha("black", 0.15), border = NA, ...) {
+    if (missing(lim)) 
+        stop("Interval limits missing.")
+    if (missing(object)) 
+        stop("No density or formula object.")
+    from <- lim[1]
+    to <- lim[2]
+    if (class(object) == "formula") {
+        x1 <- eval(object[[3]])
+        y1 <- eval(object[[2]])
+        x <- x1[x1 >= from & x1 <= to]
+        y <- y1[x1 >= from & x1 <= to]
+    }
+    if (class(object) == "density") {
+        x <- object$x[object$x >= from & object$x <= to]
+        y <- object$y[object$x >= from & object$x <= to]
+    }
+    if (class(object) == "matrix" & length(dim(object)) == 2) {
+        y <- c(object[1, ], object[2, ][ncol(object):1])
+        x <- c(lim, lim[length(lim):1])
+    }
+    if (class(object) == "matrix") {
+        polygon(x, y, col = col, border = border, ...)
+    }
+    else {
+        polygon(c(x, to, from), c(y, 0, 0), col = col, border = border, 
+            ...)
+    }
+    if (!is.null(label)) {
+        lx <- mean(x)
+        ly <- max(y)/2
+        text(lx, ly, label)
+    }
+}
+
+HPDI <-function (samples, prob = 0.89) {
+    coerce.list <- c("numeric", "matrix", "data.frame", "integer", 
+        "array")
+    if (inherits(samples, coerce.list)) {
+        samples <- coda::as.mcmc(samples)
+    }
+    x <- sapply(prob, function(p) coda::HPDinterval(samples, 
+        prob = p))
+    n <- length(prob)
+    result <- rep(0, n * 2)
+    for (i in 1:n) {
+        low_idx <- n + 1 - i
+        up_idx <- n + i
+        result[low_idx] <- x[1, i]
+        result[up_idx] <- x[2, i]
+        names(result)[low_idx] <- concat("|", prob[i])
+        names(result)[up_idx] <- concat(prob[i], "|")
+    }
+    return(result)
+}
+
+concat <- function (...) {
+    paste(..., collapse = "", sep = "")
+}
+
+#######################################################
+#################################load data#############
+#######################################################
 
 #load data from github
 d  <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/panama_data_14days.csv"), header=T)
 mono_index_all  <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/mono_indexing_all.csv"), header=T)
 mono_index_subset  <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/mono_indexing.csv"), header=T)
 
+#load simplified posterior samples from GitHub
+source_data("https://github.com/eslrworkshop/resources-2019/blob/master/day3/eslr_pn_posterior.Rdata?raw=True")
 
 ###Below is code to load locally if internet ist kaputt
 # load("/Users/brendanbarrett/eslr_pn_posterior.Rdata")#change directory to local pathway
@@ -33,10 +165,7 @@ ages <- subset(mono_index_subset, select=c(yob,mono) )
 ages$age <- 2015-ages$yob 
 ages$age.c <-ages$age - mean(ages$age)
 
-#softmax function to simplify code
-Softmax <- function(x){
-exp(x)/sum(exp(x))
-} 
+
 
 
 ##use same data list that was used when fitting stan model
@@ -178,7 +307,7 @@ vfgamma <- matrix(0,nrow=length(post$lambda),ncol=23)
 varefgamma <- rep(0,23)
 for(i in 1:23){vfgamma[,i] <- logistic(post$mu[,2] + post$a_id[,i,2] + post$b_age[,2]*ages$age.c[i] ) }
 for(i in 1:23){varefgamma[i] <- mean(vfgamma[,i])}
-lines(age.seq , pred.mean , lw=2)
+#lines(age.seq , pred.mean , lw=2)
 
 pdf("gamma_age_varef.pdf", width=8 , height=8)
 par(mar=c(5,5,0.5,0.5))
@@ -202,10 +331,57 @@ lines(age.seq , pred.mean , lw=2)
 dev.off()
 
 
+
+##################################################################
+#####code to plot model predictions against daily proportions#####
+##################################################################
+
+d$date_index <- as.integer(as.factor(d$date_index))
+d$num_open <- 0
+d$num_processed <- 0
+for (i in 1:75){
+    d$num_open <- ifelse( d$date_index==i, sum(d$open[d$date_index==i]),d$num_open )
+    d$num_processed <- ifelse( d$date_index==i, length(unique(d$fruit_index[d$date_index==i])),d$num_processed )
+}
+
+
+mat <- matrix(, nrow = 75, ncol = 8)
+for (i in 1:75){
+    for( j in 1:7) {
+        mat[i,j] <- length(unique(d$fruit_index[d$date_index==i & d$tech_index==j]))/length(unique(d$fruit_index[d$date_index==i]))
+        
+    }
+}
+
+pdf("pn_raw_data_splines_model_check.pdf", height=7,width=10)
+
+par(oma=c(1,1,0,0))
+matlo <- mat
+for (i in 1:7){
+    matlo[,i] <- ifelse(matlo[,i]==0, 0.001, matlo[,i])
+    matlo[,i] <- ifelse(matlo[,i]==1, 0.999, matlo[,i])
+
+}
+tech_id <- as.vector(sort(unique(d$tech)))
+mat[,8] <- c(1:75)
+matlo[,8] <- c(1:75)
+
+#col_ind <- c("black","red","gold","orange", "cyan" , "blue" , "magenta" )
+plot(mat[,i]~mat[,8], ylim=c(0,1) , col="white" , xlab="Experimental Days (N=75)" , ylab="daily proportion of observed techniques" , cex.lab=1.5)
+legend("top", inset=0.01, c(tech_id) , fill=col_index, border=col_index, horiz=TRUE,cex=0.75,bty = "n")
+
+for (i in 1:7){
+    points(matlo[,i]~matlo[,8], col=col.alpha(col_index[i], alpha=0.3) , pch=19 )
+    ss <- smooth.spline( x=matlo[,8],y=logit(matlo[,i]) , spar=0.95 ) 
+    lines( ss$x, logistic(ss$y), col=col_index[i] , lw=4)
+
+}
+
+dev.off()
+
 ##################################################################
 #######code to make individual level plots########################
 ##################################################################
-
 d1$fruit_index <- d$fruit_index
 d1$date_index <- d$date_index
 Preds = array(0,dim=c(nrow(d),7,23)) #predictions for all individuals, all techniques, across all timesteps
@@ -303,11 +479,6 @@ mat[,8] <- c(1:75)
 
 
 
-
-##plots where probability is constant between fruits
-
-
-
 ##below plot was not in paper but plots time series of behavioral change against all foraging behaviors, useful for analyst
 
 pdf("individual_panama_predictions_fruit_pred_all.pdf",width=11,height=8.5) 
@@ -349,6 +520,10 @@ legend(x=500 , y=-.65, inset= -.1, c(" tech succesful", "tech failure", "observe
 dev.off()
 
 
+###################################################################################
+#######################plot individual predictions from model per day###############
+###################################################################################
+
 PredsPop = array(0,dim=c(75,7))
 PredsPop2 = array(0,dim=c(75,7))
 PredsMono = array(0,dim=c(75,7,23))
@@ -368,54 +543,14 @@ for(i in 1:75){
     }
 
 
-pdf("individual_panama_predictions2.pdf",width=8.5,height=11) 
-par( mfrow=c(12, 2) , mar=c(1,1,1,1) , oma=c(4,4,.5,.5) )
-par(cex = 0.5)
-par(tcl = -0.2)
-par(mgp = c(2, 0.6, 0))
+# ###old like in spline graph at pop level
+# for(i in 1:75){
+#         for (j in 1:7){
+#             PredsPop2[i,j] <- mean(Preds2[d1$fruit_index[d1$date_index==i & d1$tech==j],j])
+#         }
+#     }
 
-for(k in 1:23){
-        plot(mat[,1]~mat[,8], ylim=c(0,1) , col="white" , xlab="" , ylab="" ,main=""  , cex.axes=0.4)
-        #legend("top", inset=0.01, c(tech_id) , fill=col_index,border=col_index, horiz=TRUE,cex=0.75,bty = "n")
-#
-    for(i in 1:75){
-        for (j in 1:7){
-            points(PredsMono[i,j,k]~i ,col=col.alpha(col_index[j], alpha=0.99) , pch=18 )
-            lines (PredsMono[i,j,k]~i ,col=col.alpha(col_index[j], alpha=0.99) , pch=18 )
- 
-        }
-mtext(mono_index$mono[k], side = 3, line = -2, adj = 0.01, cex = .8) 
-
-
-    }
-}
- plot(mat[,1]~mat[,8], ylim=c(0,1) , col="white" , xlab="" , ylab="" ,main="" , xaxt="n" , yaxt="n" , axes=FALSE)
- legend("top", inset=0.1, c(tech_id[1:3]) , fill=col_index[1:3],border=col_index[1:3], horiz=TRUE,cex=1.2,bty = "n")
- legend("bottom", inset=0.1, c(tech_id[4:7]) , fill=col_index[4:7],border=col_index[4:7], horiz=TRUE,cex=1.2,bty = "n")
-mtext("Experimental Days (N=75)", side = 1, line = 1.2, cex = 1, outer=TRUE) 
-mtext("daily average probability of choosing technique", side = 2, line = 1.2, cex = 1.2 , outer=TRUE) 
-
-#axis(1, at = seq(from=min(mat[,8]) , to=max(mat[,8]) , by = 5 ), labels=F  , tck=-0.01)
-#axis(2, at = seq(from=0 , to=1, by = 0.25) ,tck=-0.01 , labels=TRUE )
-dev.off()
-
-
-plot(mat[,1]~mat[,8], ylim=c(0,1.1) , col="white" , xlab="Experimental Days (N=75)" , ylab="probability of choosing technique" , cex.lab=1.5 )
-    for(i in 1:75){
-        for (j in 1:7){
-            points(PredsPop[i,j]~i ,col=col.alpha(col_index[j], alpha=0.99) , pch=18 )
-            lines( smooth.spline(date_rep, y=PredsPop[,j] , spar=.9) , col=col_index[j] , lw=1)
-        }
-    }
-
-
-###old
-for(i in 1:75){
-        for (j in 1:7){
-            PredsPop2[i,j] <- mean(Preds2[d1$fruit_index[d1$date_index==i & d1$tech==j],j])
-        }
-    }
-###trial
+##trial
 d1$row.seq <- seq(1:d1$N)
 d$row.seq <- seq(1:nrow(d))
 
@@ -424,8 +559,6 @@ for(i in 1:75){
             PredsPop2[i,j] <- mean(Preds2[d$row.seq[d$date_index==i & d$tech_index==j],j])
         }
     }
-
-d[d$date_index==1 & d$tech_index==1,]
 
 
 PredsPop2[is.nan(PredsPop2)] = 0
@@ -444,7 +577,7 @@ for (i in 1:7){
 
 #####code for figure s3, individual predictions by day
 
-cairo_pdf("individual_panama_predictions_with_pop.pdf",width=8.5,height=11)
+pdf("individual_panama_predictions_with_pop.pdf",width=8.5,height=11)
 m <- matrix(c(1,2,3,4,5,6,7,8,9,10,11,12,25,13,14,15,16,17,18,19,20,21,22,23,24,25), nrow = 13, ncol = 2)
 ##set up the plot
 layout(m)
@@ -452,19 +585,17 @@ par( mar=c(1,1,0.6,0.6) , oma=c(2,4,.1,.1) )
 par(cex = 0.5)
 par(tcl = -0.2)
 par(mgp = c(2, 0.6, 0))
-        plot(mat[,1]~mat[,8], ylim=c(0,1) , col="white" , xlab="" , ylab="" ,main=""  , cex.axes=0.4)
+        plot(mat[,1]~mat[,8], ylim=c(0,1) , col="white" , xlab="" , ylab="" ,main="" )
     for(i in 1:75){
         for (j in 1:7){
             points(PredsPop2[i,j]~i ,col=col.alpha(col_index[j], alpha=0.99) , pch=18 ,  )
-            #ss <- smooth.spline(x=date_rep, y=logit(PredsPop2[,j]) , spar=0.94  ) 
-            #lines( ss$x, logistic(ss$y), col=col_index[j] , lw=4)
         }
     }
 
 mtext("Population Mean", side = 3, line = -2, adj = 0.01, cex = .8) 
 
 for(k in 1:23){
-        plot(mat[,1]~mat[,8], ylim=c(0,1) , col="white" , xlab="" , ylab="" ,main=""  , cex.axes=0.4)
+        plot(mat[,1]~mat[,8], ylim=c(0,1) , col="white" , xlab="" , ylab="" ,main=""  )
         #legend("top", inset=0.01, c(tech_id) , fill=col_index,border=col_index, horiz=TRUE,cex=0.75,bty = "n")
 #
     for(i in 1:75){
