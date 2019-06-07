@@ -1,0 +1,9 @@
+# ESLR_2019
+# Day 1
+## Exercises with general simulation
+
+(1) Turn off all environmental variation and explore the evolution of conformist transmission in the presence of migration. Vary the amount of migration and observe how conformity evolves. How does the amount of migration influence reliance on conformist transmission?
+
+(2) Now turn off migration and study conformist transmission in the presence of temporal environmental variation. Vary the probability of environmental change and observe how conformity evolves. How does the amount of change influence reliance on conformist transmission?
+
+(3) Now turn on both migration and temporal environmental variation. Does anything new happpen, when both are present?
