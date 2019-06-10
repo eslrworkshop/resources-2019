@@ -1,79 +1,93 @@
-library(rethinking)
-library(truncnorm)
-#require(RColorBrewer)
-#col.pal <- brewer.pal(3, "Dark2")
-col.pal=c("#1B9E77", "#D95F02", "#7570B3") #graphing color pallette
+######################################################
+#################load packages and data ##############
+######################################################
 
-##create a softmax function to simply code
+require(rethinking)
+require(truncnorm)
+require("repmis") #to read rdata files from github
+require("RCurl") #to read csv's from github
+
+do <- read.csv(text=getURL("https://raw.githubusercontent.com/bjbarrett/resources-2019/master/panama_data_14days.csv"), header=T)
+
+######################################################
+######set conditions and run simulation ##############
+######################################################
+
 Softmax <- function(x){
 exp(x)/sum(exp(x))
-} 
+} #softmax function to simplify code
 
-#data sims
-n <- 50                                     #number of individuals/pop size
-nbouts <- 100                               #timesteps
+#set simulation parameters and conditions
 
-#simulate values for options
-techmeans <- c( 4 , 4.2 , 5)                  #mean efficiency of techniques
-techvar <- c( 1, 1 , 1)                         #variance of techniques
+n <- 25 # number of individuals
+nbouts <- 75 #rounds foraged
+techmeans <- c( mean(do$y1[do$tech_index==1 & do$open==1]),
+            mean(do$y2[do$tech_index==2 & do$open==1]),
+            mean(do$y3[do$tech_index==3 & do$open==1]),
+            mean(do$y4[do$tech_index==4 & do$open==1]) ) # list of tech means for successes from data
 
-#plot to visualize overlap of payoffs
-dens(rnorm( 10000 , mean=techmeans[1] , sd=techvar[1] ) ,col=col.pal[1] , xlim=c(0,10) )
-dens(rnorm( 10000 , mean=techmeans[2] , sd=techvar[2] ) ,col=col.pal[2] , xlim=c(0,10) , add=TRUE )
-dens(rnorm( 10000 , mean=techmeans[3] , sd=techvar[3] ) ,col=col.pal[3] , xlim=c(0,10) , add=TRUE )
+techvar <- c( sd(do$y1[do$tech_index==1 & do$open==1]),
+            sd(do$y2[do$tech_index==2 & do$open==1]),
+            sd(do$y3[do$tech_index==3 & do$open==1]),
+            sd(do$y4[do$tech_index==4 & do$open==1]) ) #list of tech variances for successes from data
+
+techprsucceed <- c(0.511,0.378,0.885,0.665) #probability technique leads to success
+
 
 #parameter sims
-fc.sim <- log(1.5)				            ##frequency dependecy parameter on log scale
-phi.sim <- logit(0.18)                       ## attraction updating parameter on log-odds scale
-gamma.sim <- logit(0.20)                     ## weight of social info parameter on log-odds scale
-k.lambda <- 1                             ##sensitivity to individual payoffs
-
+fc.sim <- log(1)		 #frequency dependecy parameter on log scale
+phi.sim <- logit(.15)    ## attraction updating parameter on log-odds scale
+gamma.sim <- logit(.14)  ## influence of social info parameter on log-odds scale
+k.lambda <- 20           ##sensitivity to individual payoffs
+beta.p <- 1.1          	 ##contribution of payoff bias cues
 
 #varying effects offsets for individuals
-gamma.sim_i <- rnorm( n , mean=0 , sd=0.5 ) 
-phi.sim_i <- rnorm( n , mean=0 , sd=0.5 ) 
-fc.sim_i <- rnorm( n , mean=0 , sd=0.5 ) 
+gamma.sim_i <- rnorm( n , mean=0 , sd=.69 )  
+phi.sim_i <- rnorm( n , mean=0 , sd=.66 ) 
+fc.sim_i <- rnorm( n , mean=0 , sd=.15 ) 
+beta.p_i <- rnorm( n , mean=0 , sd=.2 )
 
-#unique parameters for each individual, to visualize heterogeneity and for plotting individual predictions
-gamma.sim_id <- round( logistic(gamma.sim + gamma.sim_i), digits=2) ##simulated gammas for all n individuals
-phi.sim_id <- round(logistic(phi.sim +phi.sim_i), digits=2)  ##simulated phis for all n individuals
-fc.sim_id <- round(exp(fc.sim + fc.sim_i), digits=2)  ##simulated strength of frequency dependent learning for all n individuals
-gamma.sim_id
-phi.sim_id
-fc.sim_id
+logistic(gamma.sim+gamma.sim_i) 	##simulated gammas for all n individuals
+logistic(phi.sim+phi.sim_i) 		##simulated phis for all n individuals
+exp(fc.sim + fc.sim_i)				##simulated fc for all individuals
+beta.p + beta.p_i					##simulated beta for all individuals
 
-#begin to simulate data
-dsim_s <- data.frame( id=0 , bout=0 , tech=0 , y1=0 , y2=0, y3=0 , s1=0 , s2=0 , s3=0 , A1=0 , A2=0 , A3=0 , Pr1=0 , Pr2=0 , Pr3=0 )
+
+######################simulate data
+dsim_s <- data.frame( i=0 , bout=0 , tech=0 , y1=0 , y2=0, y3=0 , y4=0 , s1=0 , s2=0 , s3=0 , s4=0, ps1=0 , ps2=0 , ps3=0 , ps4=0 , A1=0 , A2=0 , A3=0 , A4=0)
 therow <- 1
-
-AC <- matrix(1,ncol=3,nrow=n) #attraction scores for each tech
-AC[,3] <- 0.2 #change to make high payoff option less likely
-Softmax(AC[1,]) #run to see initial prob of choosing a behavior
-
-S1 <- S2 <- S3 <- rep(0,n+1) # num of individuals choosing each tech in previous bout
-PS1 <- PS2 <- PS3 <- rep(0,nbouts+1) # empty vector for mean observed in previous rounds
-s_temp <-  rep(0,3)
-# S1[1] <- 0.5*nbouts
-# S2[1] <- 0.25*nbouts
-# S3[1] <- 0.25*nbouts
-
+AC <- matrix(1,ncol=4,nrow=n) #attraction scores for each tech
+AC[,3] <- 0 #all have equal prob of other behaviors, except option 3
+AC[1,] <- c(.5,.5,.6,.5) #individual 1 does option 3 most of the time, it is best option
+S1 <- S2 <- S3 <- S4 <- rep(0,n+1) # num of individuals choosing each tech in previous bout
+PS1 <- PS2 <- PS3 <- PS4 <- rep(0,nbouts+1) # empty vector for mean observed in previous rounds
+lin_mod <- s_temp <-  rep(0,4)
 for ( r in 1:nbouts ) {
     for ( i in 1:n ) {  
 
 		prtech_i <-  Softmax(k.lambda*AC[i,]) 
+        my.bp <- beta.p + beta.p_i[i]  #payoff weight for individual i
         my.gam <- logistic( gamma.sim + gamma.sim_i[i] ) #social info weight for individual i
         my.phi <- logistic( phi.sim + phi.sim_i[i] ) #social info weight for individual i
-        my.fconf <- exp( fc.sim + fc.sim_i[i])  #strength of frequency dependence for individual i
-        prtech_su <- c(S1[r],S2[r],S3[r]) #attraction score for individual i
+        my.fconf <- exp( fc.sim + fc.sim_i[i]) 
+        prtech_sp <- c(PS1[r],PS2[r],PS3[r],PS4[r]) #how will this fit into 0 payoffs
+        prtech_su <- c(S1[r],S2[r],S3[r],S4[r])
 
-        #//conformity aspect below
+        #//frequency dependent aspect below
         if ( r > 1 ) {
             if (sum( prtech_su ) > 0 ) {
 
-                #// compute frequency cue
-                for ( j in 1:3 ){ s_temp[j] <- prtech_su[j]^my.fconf}
+                #// compute non-frequency cues as log-linear model
+                for ( j in 2:4 ) {
+                    lin_mod[j] <- exp( my.bp*prtech_sp[j])
+                }
+                lin_mod[1] <- 1 #// aliased outcome
 
-                prtech_s <- s_temp/sum(s_temp)
+                #// compute frequency cue
+                for ( j in 1:4 ){ s_temp[j] <- prtech_su[j]^my.fconf}
+                for ( j in 1:4 ){lin_mod[j] <- lin_mod[j] * s_temp[j]}
+
+                prtech_s <- lin_mod/sum(lin_mod)
                 prtech <- (1-my.gam)*prtech_i + my.gam*prtech_s
 
             } else {
@@ -83,52 +97,75 @@ for ( r in 1:nbouts ) {
             prtech <- prtech_i
          }
 # choose tech
-        tech <- sample( 1:3 , size=1 , prob=prtech)
+        tech <- sample( 1:4 , size=1 , prob=prtech)
         yield <- rtruncnorm( 1 , a=0 , b=Inf, mean=techmeans[tech] , sd=techvar[tech] )
 # update attractions
-        yields <- rep(0,3)
-        yields[tech] <- yield#makes payoff yield
-        for (k in 1:3){
+        yields <- rep(0,4)
+        succeed <- sample(rbinom(1,1,techprsucceed[tech]))
+        #succeed_i <- sample(rbinom(1,1,techprsucceed[tech]))
+
+        yields[tech] <- succeed*(yield) #makes payoff 1/time if succeed, 0 if not
+
+        for (k in 1:4){
         	AC[i,k] <- (1-my.phi)*AC[i,k] + my.phi*yields[k]
         }
 
-        dsim_s[therow,] <- c( i , r , tech , yields[1] , yields[2] , yields[3] , S1[r] , S2[r] , S3[r] , AC[i,1] , AC[i,2] , AC[i,3] ,  prtech[1] , prtech[2], prtech[3] )
+        dsim_s[therow,] <- c( i , r , tech , yields[1] , yields[2] , yields[3] , yields[4] , S1[r] , S2[r] , S3[r] , S4[r], PS1[r] , PS2[r] , PS3[r] , PS4[r] , AC[i,1] , AC[i,2] , AC[i,3] , AC[i,4])
         therow <- therow + 1
     } #i
+    PS1[r+1] <- ifelse(is.nan(mean( dsim_s$y1[dsim_s$bout==r & dsim_s$tech==1] )), 0, mean( dsim_s$y1[dsim_s$bout==r & dsim_s$tech==1] ) )
+    PS2[r+1] <- ifelse(is.nan(mean( dsim_s$y2[dsim_s$bout==r & dsim_s$tech==2] )), 0, mean( dsim_s$y2[dsim_s$bout==r & dsim_s$tech==2] ) )
+    PS3[r+1] <- ifelse(is.nan(mean( dsim_s$y3[dsim_s$bout==r & dsim_s$tech==3] )), 0, mean( dsim_s$y3[dsim_s$bout==r & dsim_s$tech==3] ) )
+    PS4[r+1] <- ifelse(is.nan(mean( dsim_s$y4[dsim_s$bout==r & dsim_s$tech==4] )), 0, mean( dsim_s$y4[dsim_s$bout==r & dsim_s$tech==4] ) )
     S1[r+1] <- length( dsim_s$tech[dsim_s$tech==1 & dsim_s$bout==r] )
     S2[r+1] <- length( dsim_s$tech[dsim_s$tech==2 & dsim_s$bout==r] )
     S3[r+1] <- length( dsim_s$tech[dsim_s$tech==3 & dsim_s$bout==r] )
+    S4[r+1] <- length( dsim_s$tech[dsim_s$tech==4 & dsim_s$bout==r] )
 
  }
 
 o <- order( dsim_s$i )
-dsim <- dsim_s[o,]
+dsim2 <- dsim_s[o,]
 
-#plot raw data of group level effects
-plot(s1/n ~ bout, data=dsim, col=col.pal[1] , ylim=c(0,1) , xlim=c(2,nbouts+1), pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , main="Population Mean ")
-points(s2/n ~ bout, data=dsim , col=col.pal[2], pch=19)
-points(s3/n ~ bout, data=dsim , col=col.pal[3], pch=19)
-legend("topleft", cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TRUE , bty="y")
+##############plot simulated data at population level
+col.pal <- c("#1B9E77" ,"#D95F02" ,"#7570B3", "#E7298A")
+plot(s1/n ~ bout, data=dsim2, col=col.pal[1] , ylim=c(0,1) , pch=19 , xlab="Time (Foraging Bouts)" , ylab="Proportion of Individuals Choosing Option" , main="4 options, green higest payoff", xlim=c(2,nbouts) )
+points(s2/n ~ bout, data=dsim2 , col=col.pal[2], pch=19)
+points(s3/n ~ bout, data=dsim2 , col=col.pal[3], pch=19)
+points(s4/n ~ bout, data=dsim2 , col=col.pal[4], pch=19)
+legend("topleft", cex=1 , as.character(round(techmeans*techprsucceed, digits=3)), pch=19 ,col=col.pal, horiz=TRUE , bty="n")
 
+######################################################
+######run EWA model on simulated data## ##############
+######################################################
 
+# #turn simulated data to a list for r-stan
 # ds <- list(
-# N = nrow(dsim),
-# J = length( unique(dsim$i)),
-# K=max(dsim$tech),
-# tech = dsim$tech,
-# y = cbind( dsim$y1 , dsim$y2 , dsim$y3 ),
-# s = cbind(dsim$s1 , dsim$s2 , dsim$s3),
-# id = dsim$i,
-# bout = dsim$bout ,
-# N_effects=3
+# N = nrow(dsim2),
+# J = length( unique(dsim2$i)),
+# K=max(dsim2$tech),
+# tech = dsim2$tech,
+# y = cbind( dsim2$y1 , dsim2$y2 , dsim2$y3 , dsim2$y4 ),
+# s = cbind(dsim2$s1 , dsim2$s2 , dsim2$s3 , dsim2$s4 ),
+# ps = cbind(dsim2$ps1 , dsim2$ps2 , dsim2$ps3 , dsim2$ps4)  ,
+# id = dsim2$i,
+# bout = dsim2$bout ,
+# N_effects=4
 # )
-# parlistcombo=c("lambda" ,"a_id" , "mu" , "fconf", "dev" , "log_lik")
+# parlistcombo=c("lambda" ,"a_id" , "mu" ,"Bpay", "fconf", "dev" , "log_lik")
 
+# #fit model in stan
 # fit_combo <- stan( file = 'PN_social_combo.stan', data = ds , 
-#     iter = 2000, warmup=1000, chains=2, cores=2, pars=parlistcombo, 
+#     iter = 2000, warmup=1000, chains=2, cores=3, pars=parlistcombo, 
 #     control=list( adapt_delta=0.98 ) )
 
-# post <- extract(fit_combo)
+# post <- extract(fit_combo) # extract posterior
+
+# ######################################################
+# ######check parameters and model predictions##########
+# ######################################################
+
+# #plot to recover main effects
 # par(mfrow=c(2, 2), oma = c(0, 0, 0, 0) , mar=c(3,.5,2,.5))
 # par(cex = 0.6)
 # par(tcl = -0.25)
@@ -147,8 +184,8 @@ legend("topleft", cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TR
 # shade( density(exp(post$mu[,3])) , lim= as.vector(HPDI(exp(post$mu[,3]), prob=0.9999)) , col = col.alpha("red", 0.25))
 
 # dens(post$mu[,4]  ,main=expression(paste(beta)[pay]) ,  xlim=c(-4,4), xlab="d. strength of payoff bias" , ylab='',col="white", yaxt='n', cex.lab=1.5)##fpay
-# abline( v=beta.p , col=col.pal[1]  ) 
-# shade( density(post$mu[,4]) , lim= as.vector(HPDI((post$mu[,4]), prob=0.9999)) , col = col.alpha(col.pal[1], 0.25))
+# abline( v=beta.p , col="orange"  ) 
+# shade( density(post$mu[,4]) , lim= as.vector(HPDI((post$mu[,4]), prob=0.9999)) , col = col.alpha("orange", 0.25))
 
 # dens(as.vector(post$lambda) , main=expression(paste(lambda)) , ylab='', xlab="i. sensitivity to individual payoff" , col="white" , yaxt='n', cex.lab=1.5)
 # abline( v=k.lambda , col="black" ) 
@@ -156,11 +193,14 @@ legend("topleft", cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TR
 
 # dens(post$lambda)
 
+# #plot varying effects (recommend exploring parameter space to see under what conditions these can be recovered. 
+# #if task is too easy to learn individually, varying efects for gamma are hard to recover
+# #if behavior changes quickly at population level and the past is not different from recent behavior varying effects of phi are hard to recover
+
 # gam.k <- logistic(gamma.sim + gamma.sim_i)
 # gam.pred <- rep(0,n)
 # for(i in 1:n){gam.pred[i] <- mean(logistic(post$mu[,2] + post$a_id[,i,2]))}
-# ###plot for 2 options probability frequencyxtime(evolutionary dynamics)
-# plot(gam.k,gam.pred , pch=19 , col=col.pal[1] , xlim=c(0,0.7) , ylim=c(0,0.7) )
+# plot(gam.k,gam.pred , pch=19 , col="orange" , xlim=c(0,0.7) , ylim=c(0,0.7) )
 # abline(a = 0, b = 1)
 
 
@@ -169,25 +209,4 @@ legend("topleft", cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TR
 # for(i in 1:n){phi.pred[i] <- median(logistic(post$mu[,1] + post$a_id[,i,1]))}
 # plot(phi.k,phi.pred , pch=19 , col="slateblue" , xlim=c(0,0.6) , ylim=c(0,0.6) )
 # abline(a = 0, b = 1)
-pdf("freq_sims.pdf",width=9,height=11)
-par(mfrow=c(5,2))##set up the plot
-par( mar=c(4,5,0.6,0.6) , oma=c(1,1,.1,.1) )
-par(cex = 0.5)
 
-###main plot
-plot(s1/n ~ (bout-1), data=dsim, col=col.pal[1] , ylim=c(0,1.1) , pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , xlim=c(2,nbouts) )
-points(s2/n ~ (bout-1), data=dsim , col=col.pal[2], pch=19)
-points(s3/n ~ (bout-1), data=dsim , col=col.pal[3], pch=19)
-title(main = paste("Pop. Mean: lambda=",k.lambda ,", gamma=",round(logistic(gamma.sim), digits=2),", phi=",round(logistic(phi.sim),digits=2),", f=", exp(round(fc.sim,digits=2 ))) , line = -1.1, outer = FALSE)
-legend("top", inset=.8, cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TRUE , bty="n")
-
-for(i in 1:n){
-    plot(Pr1 ~ (bout-1), data=dsim[dsim$id==i,] , col=col.pal[1] , ylim=c(0,1.1) , pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , xlim=c(2,nbouts) )
-    points(Pr2 ~ (bout-1), data=dsim[dsim$id==i,] , col=col.pal[2], pch=19)
-    points(Pr3 ~ (bout-1), data=dsim[dsim$id==i,] , col=col.pal[3], pch=19)
-    title(main = paste("id=",i ,", lambda=",k.lambda ,", gamma=",gamma.sim_id[i],", phi=",phi.sim_id[i],", f=", fc.sim_id[i] ) , line = -1.1, outer = FALSE)
-    legend("top", inset=.8, cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TRUE , bty="n")
-
-}
-
-dev.off()

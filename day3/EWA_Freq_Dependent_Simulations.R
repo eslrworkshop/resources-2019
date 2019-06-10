@@ -4,13 +4,21 @@
 
 col.pal=c("#1B9E77", "#D95F02", "#7570B3") #graphing color pallette
 
-#########create a softmax function to simply code
+#########create a softmax function to simply code, add in logit and logistic fcns
 Softmax <- function(x){
-exp(x)/sum(exp(x))
+    exp(x)/sum(exp(x))
 } 
 
-#######add convenient density plooting function, lifted from rethinking by McElreath
-function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE, 
+logit <- function(p){ 
+    (log(p/(1-p)))
+}
+
+logistic <- function(x){ 
+    (1/(1+exp(-x)))
+}
+
+#######add convenient density plooting function, code lifted from rethinking by McElreath
+dens <- function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE, 
     show.zero = FALSE, rm.na = TRUE, add = FALSE, ...) 
 {
     if (inherits(x, "data.frame")) {
@@ -49,29 +57,36 @@ function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE,
     }
 }
 
+set_nice_margins <- function () {
+    par_mf <- par("mfrow", "mfcol")
+    if (all(unlist(par_mf) == 1)) {
+        par(mgp = c(1.5, 0.5, 0), mar = c(2.5, 2.5, 2, 1) + 0.1, 
+            tck = -0.02)
+    }
+}
+
 #######################################################
 ######begin data simulations###########################
 #######################################################
 
 #data sims
-n <- 50                                     #number of individuals/pop size
-nbouts <- 100                               #timesteps
+n <- 50                                  #number of individuals/pop size
+nbouts <- 75                             #timesteps
 
 #simulate values for options
-techmeans <- c( 8 , 8.1 , 16)               #mean efficiency of techniques
-techvar <- c( 1, 1 , 1)                     #variance of techniques
+techmeans <- c(8 , 8 , 8)               #mean efficiency of techniques
+techvar <- c(0, 0 , 0)                  #variance of techniques
 
 #parameter sims
-fc.sim <- log(2)				             ##frequency dependecy parameter on log scale
-phi.sim <- logit(0.18)                       ##attraction updating parameter on log-odds scale
-gamma.sim <- logit(0.1)                     ##weight of social info parameter on log-odds scale
-k.lambda <- 1                                ##sensitivity to individual payoffs
-
+fc.sim <- log(2)				          #frequency dependecy parameter on log scale
+phi.sim <- logit(0.18)                    #memory/attraction updating parameter on log-odds scale
+gamma.sim <- 1                            #weight given to social info parameter on log-odds scale
+k.lambda <- 1                             #sensitivity to individual payoffs
 
 #varying effects offsets for individuals
-gamma.sim_i <- rnorm( n , mean=0 , sd=0.5 ) 
-phi.sim_i <- rnorm( n , mean=0 , sd=0.5 ) 
-fc.sim_i <- rnorm( n , mean=0 , sd=0.5 ) 
+gamma.sim_i <- rnorm( n , mean=0 , sd=0) ##frequency dependent offsets per individual
+phi.sim_i <- rnorm( n , mean=0 , sd=0)   
+fc.sim_i <- rnorm( n , mean=0 , sd=0) 
 
 #plot to visualize overlap of payoffs
 dens(rnorm( 10000 , mean=techmeans[1] , sd=techvar[1] ) ,col=col.pal[1] , xlim=c(0,20) )
@@ -97,21 +112,22 @@ Softmax(AC[1,]) 															#run to see initial prob of choosing a behavior
 S1 <- S2 <- S3 <- rep(0,n+1) 												# num of individuals choosing each tech in previous bout
 PS1 <- PS2 <- PS3 <- rep(0,nbouts+1) 										# empty vector for mean observed in previous rounds
 s_temp <-  rep(0,3)
-# S1[1] <- 0.5*nbouts
-# S2[1] <- 0.25*nbouts
-# S3[1] <- 0.25*nbouts
+
+# S1[1] <- 0.48*nbouts
+# S2[1] <- 0.32*nbouts
+# S3[1] <- 0.2*nbouts
 
 for ( r in 1:nbouts ) {
     for ( i in 1:n ) {  
 
 		prtech_i <-  Softmax(k.lambda*AC[i,]) 
         my.gam <- logistic( gamma.sim + gamma.sim_i[i] ) 	#social info weight for individual i
-        my.phi <- logistic( phi.sim + phi.sim_i[i] )		#social info weight for individual i
+        my.phi <- logistic( phi.sim + phi.sim_i[i] )		#weight given to past experience for individual i
         my.fconf <- exp( fc.sim + fc.sim_i[i])  			#strength of frequency dependence for individual i
-        prtech_su <- c(S1[r],S2[r],S3[r]) 					#attraction score for individual i
+        prtech_su <- c(S1[r],S2[r],S3[r]) 					#social info individual i observed
 
-        #//conformity aspect below
-        if ( r > 1 ) {
+        #//frequency dependent social learning aspect below
+        if ( r >= 1 ) { 
             if (sum( prtech_su ) > 0 ) {
 
                 #// compute frequency cue
@@ -151,10 +167,10 @@ o <- order( dsim_s$i )
 dsim <- dsim_s[o,]
 
 #plot raw data of group level effects
-plot(s1/n ~ bout, data=dsim, col=col.pal[1] , ylim=c(0,1) , xlim=c(2,nbouts+1), pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , main="Population Mean ")
-points(s2/n ~ bout, data=dsim , col=col.pal[2], pch=19)
-points(s3/n ~ bout, data=dsim , col=col.pal[3], pch=19)
-legend("topleft", cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TRUE , bty="y")
+plot(s1/n ~ bout, data=dsim[dsim$bout>1,], col=col.pal[1] , ylim=c(0,1.1) , xlim=c(2,nbouts+1), pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , main="Population Mean ")
+points(s2/n ~ bout, data=dsim[dsim$bout>1,] , col=col.pal[2], pch=19)
+points(s3/n ~ bout, data=dsim[dsim$bout>1,] , col=col.pal[3], pch=19)
+legend("topleft", cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TRUE , bty="n", title="Payoffs")
 
 pdf("freq_sims.pdf",width=9,height=11)
 par(mfrow=c(5,2))##set up the plot
@@ -162,16 +178,16 @@ par( mar=c(4,5,0.6,0.6) , oma=c(1,1,.1,.1) )
 par(cex = 0.5)
 
 ###main plot
-plot(s1/n ~ (bout-1), data=dsim, col=col.pal[1] , ylim=c(0,1.2) , pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , xlim=c(2,nbouts) )
-points(s2/n ~ (bout-1), data=dsim , col=col.pal[2], pch=19)
-points(s3/n ~ (bout-1), data=dsim , col=col.pal[3], pch=19)
+plot(s1/n ~ bout, data=dsim[dsim$bout>1,], col=col.pal[1] , ylim=c(0,1.2) , pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , xlim=c(2,nbouts) )
+points(s2/n ~ bout, data=dsim[dsim$bout>1,] , col=col.pal[2], pch=19)
+points(s3/n ~ bout, data=dsim[dsim$bout>1,] , col=col.pal[3], pch=19)
 title(main = paste("Pop. Mean: lambda=",k.lambda ,", gamma=",round(logistic(gamma.sim), digits=2),", phi=",round(logistic(phi.sim),digits=2),", f=", exp(round(fc.sim,digits=2 ))) , line = -1.2, outer = FALSE)
 legend("top", inset=.05, cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TRUE , bty="n")
 
 for(i in 1:n){
-    plot(Pr1 ~ (bout-1), data=dsim[dsim$id==i,] , col=col.pal[1] , ylim=c(0,1.2) , pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , xlim=c(2,nbouts) )
-    points(Pr2 ~ (bout-1), data=dsim[dsim$id==i,] , col=col.pal[2], pch=19)
-    points(Pr3 ~ (bout-1), data=dsim[dsim$id==i,] , col=col.pal[3], pch=19)
+    plot(Pr1 ~ (bout-1), data=dsim[dsim$id==i & dsim$bout>1,] , col=col.pal[1] , ylim=c(0,1.2) , pch=19 , xlab="Time" , ylab="Proportion of Individuals Choosing Option" , xlim=c(2,nbouts) )
+    points(Pr2 ~ (bout-1), data=dsim[dsim$id==i & dsim$bout>1,] , col=col.pal[2], pch=19)
+    points(Pr3 ~ (bout-1), data=dsim[dsim$id==i & dsim$bout>1,] , col=col.pal[3], pch=19)
     title(main = paste("id=",i ,", lambda=",k.lambda ,", gamma=",gamma.sim_id[i],", phi=",phi.sim_id[i],", f=", fc.sim_id[i] ) , line = -1.2, outer = FALSE)
     legend("top", inset=.05, cex=1 , as.character(techmeans), pch=19 ,col=col.pal, horiz=TRUE , bty="n")
 
@@ -179,63 +195,3 @@ for(i in 1:n){
 
 dev.off()
 
-
-
-# ds <- list(
-# N = nrow(dsim),
-# J = length( unique(dsim$i)),
-# K=max(dsim$tech),
-# tech = dsim$tech,
-# y = cbind( dsim$y1 , dsim$y2 , dsim$y3 ),
-# s = cbind(dsim$s1 , dsim$s2 , dsim$s3),
-# id = dsim$i,
-# bout = dsim$bout ,
-# N_effects=3
-# )
-# parlistcombo=c("lambda" ,"a_id" , "mu" , "fconf", "dev" , "log_lik")
-
-# fit_combo <- stan( file = 'PN_social_combo.stan', data = ds , 
-#     iter = 2000, warmup=1000, chains=2, cores=2, pars=parlistcombo, 
-#     control=list( adapt_delta=0.98 ) )
-
-# post <- extract(fit_combo)
-# par(mfrow=c(2, 2), oma = c(0, 0, 0, 0) , mar=c(3,.5,2,.5))
-# par(cex = 0.6)
-# par(tcl = -0.25)
-# par(mgp = c(2, 0.6, 0))
-
-# dens(logistic(post$mu[,1]) , main=expression(paste(phi)) , xlim=c(0,1), ylab='' , xlab= "a. weight of new experience" , col="white", yaxt='n' , cex.lab=1.5)##phi
-# abline( v=logistic(phi.sim) , col="cornflowerblue" ) 
-# shade( density(logistic(post$mu[,1])) , lim= as.vector(HPDI(logistic(post$mu[,1]), prob=0.9999)) , col = col.alpha("cornflowerblue", 0.25))
-
-# dens(logistic(post$mu[,2]) , main=expression(paste(gamma))  ,  xlim=c(0,1) , ylab='', xlab= "b. weight of social information" , col="white", yaxt='n', , cex.lab=1.5) #gamma
-# abline(v=logistic(gamma.sim) , col="cornflowerblue") 
-# shade( density(logistic(post$mu[,2])) , lim= as.vector(HPDI(logistic(post$mu[,2]), prob=0.9999)) , col = col.alpha("cornflowerblue", 0.25))
-
-# dens(exp(post$mu[,3]) , main=expression(paste( "\u0192"[c])),  xlim=c(0,4) , xlab="c. strength of frequency dependence" , col="white", ylab='', yaxt='n',  cex.lab=1.5)##fconf
-# abline(v=exp(fc.sim) , col="red" ) #fconf
-# shade( density(exp(post$mu[,3])) , lim= as.vector(HPDI(exp(post$mu[,3]), prob=0.9999)) , col = col.alpha("red", 0.25))
-
-# dens(post$mu[,4]  ,main=expression(paste(beta)[pay]) ,  xlim=c(-4,4), xlab="d. strength of payoff bias" , ylab='',col="white", yaxt='n', cex.lab=1.5)##fpay
-# abline( v=beta.p , col=col.pal[1]  ) 
-# shade( density(post$mu[,4]) , lim= as.vector(HPDI((post$mu[,4]), prob=0.9999)) , col = col.alpha(col.pal[1], 0.25))
-
-# dens(as.vector(post$lambda) , main=expression(paste(lambda)) , ylab='', xlab="i. sensitivity to individual payoff" , col="white" , yaxt='n', cex.lab=1.5)
-# abline( v=k.lambda , col="black" ) 
-# shade( density(post$lambda) , lim= HPDI(as.vector(post$lambda), prob=0.9999) , col = col.alpha("black", 0.25) )
-
-# dens(post$lambda)
-
-# gam.k <- logistic(gamma.sim + gamma.sim_i)
-# gam.pred <- rep(0,n)
-# for(i in 1:n){gam.pred[i] <- mean(logistic(post$mu[,2] + post$a_id[,i,2]))}
-# ###plot for 2 options probability frequencyxtime(evolutionary dynamics)
-# plot(gam.k,gam.pred , pch=19 , col=col.pal[1] , xlim=c(0,0.7) , ylim=c(0,0.7) )
-# abline(a = 0, b = 1)
-
-
-# phi.k<- logistic(phi.sim + phi.sim_i)
-# phi.pred <- rep(0,n)
-# for(i in 1:n){phi.pred[i] <- median(logistic(post$mu[,1] + post$a_id[,i,1]))}
-# plot(phi.k,phi.pred , pch=19 , col="slateblue" , xlim=c(0,0.6) , ylim=c(0,0.6) )
-# abline(a = 0, b = 1)
