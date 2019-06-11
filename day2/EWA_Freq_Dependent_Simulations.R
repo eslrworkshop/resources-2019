@@ -3,23 +3,24 @@
 #######################################################
 
 col.pal=c("#1B9E77", "#D95F02", "#7570B3") #graphing color pallette
+getwd() #identify working directory
 
 #########create a softmax function to simply code, add in logit and logistic fcns
 Softmax <- function(x){
     exp(x)/sum(exp(x))
-} 
+}
 
-logit <- function(p){ 
+logit <- function(p){
     (log(p/(1-p)))
 }
- 
-logistic <- function(x){ 
+
+logistic <- function(x){
     (1/(1+exp(-x)))
 }
 
 #######add convenient density plooting function, code lifted from rethinking by McElreath
-dens <- function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE, 
-                  show.zero = FALSE, rm.na = TRUE, add = FALSE, ...) 
+dens <- function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE,
+                  show.zero = FALSE, rm.na = TRUE, add = FALSE, ...)
 {
     if (inherits(x, "data.frame")) {
         n <- ncol(x)
@@ -27,12 +28,12 @@ dens <- function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE,
         set_nice_margins()
         par(mfrow = make.grid(n))
         for (i in 1:n) {
-            dens(x[, i], adj = adj, norm.comp = norm.comp, show.HPDI = show.HPDI, 
+            dens(x[, i], adj = adj, norm.comp = norm.comp, show.HPDI = show.HPDI,
                  show.zero = TRUE, xlab = cnames[i], ...)
         }
     }
     else {
-        if (rm.na == TRUE) 
+        if (rm.na == TRUE)
             x <- x[!is.na(x)]
         thed <- density(x, adjust = adj)
         if (add == FALSE) {
@@ -47,7 +48,7 @@ dens <- function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE,
         if (norm.comp == TRUE) {
             mu <- mean(x)
             sigma <- sd(x)
-            curve(dnorm(x, mu, sigma), col = "white", lwd = 2, 
+            curve(dnorm(x, mu, sigma), col = "white", lwd = 2,
                   add = TRUE)
             curve(dnorm(x, mu, sigma), add = TRUE)
         }
@@ -60,7 +61,7 @@ dens <- function (x, adj = 0.5, norm.comp = FALSE, main = "", show.HPDI = FALSE,
 set_nice_margins <- function () {
     par_mf <- par("mfrow", "mfcol")
     if (all(unlist(par_mf) == 1)) {
-        par(mgp = c(1.5, 0.5, 0), mar = c(2.5, 2.5, 2, 1) + 0.1, 
+        par(mgp = c(1.5, 0.5, 0), mar = c(2.5, 2.5, 2, 1) + 0.1,
             tck = -0.02)
     }
 }
@@ -74,19 +75,19 @@ n <- 50                                  #number of individuals/pop size
 nbouts <- 75                             #timesteps
 
 #simulate values for options
-techmeans <- c(8 , 9 , 10)               #mean efficiency of techniques
-techvar <- c(2,  2 , 2)                   #variance of techniques
+techmeans <- c(8 , 8 , 8)               #mean efficiency of techniques
+techvar <- c(0 , 0 ,0)                   #variance of techniques
 
 #parameter sims
-gamma.sim <- logit(0.2)                   #weight given to social info par on log-odds scale
-phi.sim <- logit(0.15)                     #memory/attraction updating par on log-odds scale
-fc.sim <- log(1.1)				          #frequency dep par on log scale
+gamma.sim <- logit(1)                   #weight given to social info par on log-odds scale
+phi.sim <- logit(0.2)                     #memory/attraction updating par on log-odds scale
+fc.sim <- log(1.5)				          #frequency dep par on log scale
 k.lambda <- 0.4                           #sensitivity to attraction score differences
 
 #varying effects offsets for individuals
-gamma.sim_i <- rnorm( n , mean=0 , sd=0.5) #weight given to social info offsets per i
-phi.sim_i <- rnorm( n , mean=0 , sd=0.5)   #memory/attraction updating offsets per i
-fc.sim_i <- rnorm( n , mean=0 , sd=0.5)     #frequency dependent offsets per i
+gamma.sim_i <- rnorm( n , mean=0 , sd=0) #weight given to social info offsets per i
+phi.sim_i <- rnorm( n , mean=0 , sd=0)   #memory/attraction updating offsets per i
+fc.sim_i <- rnorm( n , mean=0 , sd=0)     #frequency dependent offsets per i
 
 #plot to visualize overlap of payoffs
 dens(rnorm( 10000 , mean=techmeans[1] , sd=techvar[1] ) ,col=col.pal[1] , xlim=c(0,20) )
@@ -105,17 +106,17 @@ fc.sim_id
 dsim_s <- data.frame( id=0 , bout=0 , tech=0 , y1=0 , y2=0, y3=0 , s1=0 , s2=0 , s3=0 , A1=0 , A2=0 , A3=0 , Pr1=0 , Pr2=0 , Pr3=0 )
 therow <- 1
 
-AC <- matrix(2,ncol=3,nrow=n) 												#attraction scores for each behavior
-AC[,3] <- 0.01                                                             #make low payoff behavior rare
+AC <- matrix(1,ncol=3,nrow=n) 												#attraction scores for each behavior
+# AC[,3] <- 0.01                                                             #make low payoff behavior rare
 Softmax(AC[1,]) 															#run to see initial prob of choosing a behavior
 
 S1 <- S2 <- S3 <- rep(0,n+1) 												# num of individuals choosing each tech in previous bout
 PS1 <- PS2 <- PS3 <- rep(0,nbouts+1) 										# empty vector for mean observed in previous rounds
 s_temp <-  rep(0,3)
 
-# S1[1] <- 0.5
-# S2[1] <- 0.3
-# S3[1] <- 0.2
+S1[1] <- 0.5
+S2[1] <- 0.3
+S3[1] <- 0.2
 
 for ( r in 1:nbouts ) {
     for ( i in 1:n ) {  
@@ -163,7 +164,7 @@ for ( r in 1:nbouts ) {
     
 }
 
-o <- order( dsim_s$i )
+o <- order( dsim_s$id )
 dsim <- dsim_s[o,]
 
 #plot raw data of group level effects
@@ -196,4 +197,5 @@ for(i in 1:n){
 
 }
 
+getwd()
 dev.off()
