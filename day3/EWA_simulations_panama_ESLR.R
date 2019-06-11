@@ -2,20 +2,31 @@
 #################load packages and data ##############
 ######################################################
 
-require(rethinking)
+# require(rethinking) #commented it out but you would need rstan and this package loaded to run model and check model predictions
 require(truncnorm)
 require("repmis") #to read rdata files from github
 require("RCurl") #to read csv's from github
 
-do <- read.csv(text=getURL("https://raw.githubusercontent.com/bjbarrett/resources-2019/master/panama_data_14days.csv"), header=T)
+do <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/panama_data_14days.csv"), header=T)
 
 ######################################################
-######set conditions and run simulation ##############
-######################################################
+######load useful functions###########################
+#####################################################
 
 Softmax <- function(x){
 exp(x)/sum(exp(x))
 } #softmax function to simplify code
+
+logistic <- function(x){ 
+    (1/(1+exp(-x)))
+}
+
+logit <- function(p){ 
+    (log(p/(1-p)))
+}
+######################################################
+######set conditions and run simulation ##############
+#####################################################
 
 #set simulation parameters and conditions
 
@@ -129,15 +140,15 @@ dsim2 <- dsim_s[o,]
 
 ##############plot simulated data at population level
 col.pal <- c("#1B9E77" ,"#D95F02" ,"#7570B3", "#E7298A")
-plot(s1/n ~ bout, data=dsim2, col=col.pal[1] , ylim=c(0,1) , pch=19 , xlab="Time (Foraging Bouts)" , ylab="Proportion of Individuals Choosing Option" , main="4 options, green higest payoff", xlim=c(2,nbouts) )
+plot(s1/n ~ bout, data=dsim2, col=col.pal[1] , ylim=c(0,1) , pch=19 , xlab="Time (Foraging Bouts)" , ylab="Proportion of Individuals Choosing Option" , xlim=c(2,nbouts) )
 points(s2/n ~ bout, data=dsim2 , col=col.pal[2], pch=19)
 points(s3/n ~ bout, data=dsim2 , col=col.pal[3], pch=19)
 points(s4/n ~ bout, data=dsim2 , col=col.pal[4], pch=19)
 legend("topleft", cex=1 , as.character(round(techmeans*techprsucceed, digits=3)), pch=19 ,col=col.pal, horiz=TRUE , bty="n")
 
-######################################################
-######run EWA model on simulated data## ##############
-######################################################
+#####################################################
+#####run EWA model on simulated data## ##############
+#####################################################
 
 # #turn simulated data to a list for r-stan
 # ds <- list(
@@ -152,61 +163,63 @@ legend("topleft", cex=1 , as.character(round(techmeans*techprsucceed, digits=3))
 # bout = dsim2$bout ,
 # N_effects=4
 # )
+
 # parlistcombo=c("lambda" ,"a_id" , "mu" ,"Bpay", "fconf", "dev" , "log_lik")
+
 
 # #fit model in stan
 # fit_combo <- stan( file = 'PN_social_combo.stan', data = ds , 
-#     iter = 2000, warmup=1000, chains=2, cores=3, pars=parlistcombo, 
-#     control=list( adapt_delta=0.98 ) )
+#     iter = 2000, warmup=1000, chains=1, cores=1, pars=parlistcombo, 
+#     control=list( adapt_delta=0.99 ) )
 
 # post <- extract(fit_combo) # extract posterior
 
-# ######################################################
-# ######check parameters and model predictions##########
-# ######################################################
-
+######################################################
+######check parameters and model predictions##########
+######################################################
+# 
 # #plot to recover main effects
 # par(mfrow=c(2, 2), oma = c(0, 0, 0, 0) , mar=c(3,.5,2,.5))
 # par(cex = 0.6)
 # par(tcl = -0.25)
 # par(mgp = c(2, 0.6, 0))
-
+# 
 # dens(logistic(post$mu[,1]) , main=expression(paste(phi)) , xlim=c(0,1), ylab='' , xlab= "a. weight of new experience" , col="white", yaxt='n' , cex.lab=1.5)##phi
 # abline( v=logistic(phi.sim) , col="cornflowerblue" ) 
 # shade( density(logistic(post$mu[,1])) , lim= as.vector(HPDI(logistic(post$mu[,1]), prob=0.9999)) , col = col.alpha("cornflowerblue", 0.25))
-
+# 
 # dens(logistic(post$mu[,2]) , main=expression(paste(gamma))  ,  xlim=c(0,1) , ylab='', xlab= "b. weight of social information" , col="white", yaxt='n', , cex.lab=1.5) #gamma
 # abline(v=logistic(gamma.sim) , col="cornflowerblue") 
 # shade( density(logistic(post$mu[,2])) , lim= as.vector(HPDI(logistic(post$mu[,2]), prob=0.9999)) , col = col.alpha("cornflowerblue", 0.25))
-
+# 
 # dens(exp(post$mu[,3]) , main=expression(paste( "\u0192"[c])),  xlim=c(0,4) , xlab="c. strength of frequency dependence" , col="white", ylab='', yaxt='n',  cex.lab=1.5)##fconf
 # abline(v=exp(fc.sim) , col="red" ) #fconf
 # shade( density(exp(post$mu[,3])) , lim= as.vector(HPDI(exp(post$mu[,3]), prob=0.9999)) , col = col.alpha("red", 0.25))
-
+# 
 # dens(post$mu[,4]  ,main=expression(paste(beta)[pay]) ,  xlim=c(-4,4), xlab="d. strength of payoff bias" , ylab='',col="white", yaxt='n', cex.lab=1.5)##fpay
 # abline( v=beta.p , col="orange"  ) 
 # shade( density(post$mu[,4]) , lim= as.vector(HPDI((post$mu[,4]), prob=0.9999)) , col = col.alpha("orange", 0.25))
-
+# 
 # dens(as.vector(post$lambda) , main=expression(paste(lambda)) , ylab='', xlab="i. sensitivity to individual payoff" , col="white" , yaxt='n', cex.lab=1.5)
 # abline( v=k.lambda , col="black" ) 
 # shade( density(post$lambda) , lim= HPDI(as.vector(post$lambda), prob=0.9999) , col = col.alpha("black", 0.25) )
-
+# 
 # dens(post$lambda)
-
+# 
 # #plot varying effects (recommend exploring parameter space to see under what conditions these can be recovered. 
 # #if task is too easy to learn individually, varying efects for gamma are hard to recover
 # #if behavior changes quickly at population level and the past is not different from recent behavior varying effects of phi are hard to recover
-
+# 
 # gam.k <- logistic(gamma.sim + gamma.sim_i)
 # gam.pred <- rep(0,n)
 # for(i in 1:n){gam.pred[i] <- mean(logistic(post$mu[,2] + post$a_id[,i,2]))}
 # plot(gam.k,gam.pred , pch=19 , col="orange" , xlim=c(0,0.7) , ylim=c(0,0.7) )
 # abline(a = 0, b = 1)
-
-
+# 
+# 
 # phi.k<- logistic(phi.sim + phi.sim_i)
 # phi.pred <- rep(0,n)
 # for(i in 1:n){phi.pred[i] <- median(logistic(post$mu[,1] + post$a_id[,i,1]))}
 # plot(phi.k,phi.pred , pch=19 , col="slateblue" , xlim=c(0,0.6) , ylim=c(0,0.6) )
 # abline(a = 0, b = 1)
-
+# 
