@@ -2,7 +2,7 @@
 #################load packages and data ##############
 ######################################################
 
-require(rethinking)
+# require(rethinking) #commented it out but you would need rstan and this package loaded to run model and check model predictions
 require(truncnorm)
 require("repmis") #to read rdata files from github
 require("RCurl") #to read csv's from github
@@ -10,12 +10,23 @@ require("RCurl") #to read csv's from github
 do <- read.csv(text=getURL("https://raw.githubusercontent.com/eslrworkshop/resources-2019/master/day3/panama_data_14days.csv"), header=T)
 
 ######################################################
-######set conditions and run simulation ##############
-######################################################
+######load useful functions###########################
+#####################################################
 
 Softmax <- function(x){
 exp(x)/sum(exp(x))
 } #softmax function to simplify code
+
+logistic <- function(x){ 
+    (1/(1+exp(-x)))
+}
+
+logit <- function(p){ 
+    (log(p/(1-p)))
+}
+######################################################
+######set conditions and run simulation ##############
+#####################################################
 
 #set simulation parameters and conditions
 
@@ -139,29 +150,29 @@ legend("topleft", cex=1 , as.character(round(techmeans*techprsucceed, digits=3))
 #####run EWA model on simulated data## ##############
 #####################################################
 
-#turn simulated data to a list for r-stan
-ds <- list(
-N = nrow(dsim2),
-J = length( unique(dsim2$i)),
-K=max(dsim2$tech),
-tech = dsim2$tech,
-y = cbind( dsim2$y1 , dsim2$y2 , dsim2$y3 , dsim2$y4 ),
-s = cbind(dsim2$s1 , dsim2$s2 , dsim2$s3 , dsim2$s4 ),
-ps = cbind(dsim2$ps1 , dsim2$ps2 , dsim2$ps3 , dsim2$ps4)  ,
-id = dsim2$i,
-bout = dsim2$bout ,
-N_effects=4
-)
+# #turn simulated data to a list for r-stan
+# ds <- list(
+# N = nrow(dsim2),
+# J = length( unique(dsim2$i)),
+# K=max(dsim2$tech),
+# tech = dsim2$tech,
+# y = cbind( dsim2$y1 , dsim2$y2 , dsim2$y3 , dsim2$y4 ),
+# s = cbind(dsim2$s1 , dsim2$s2 , dsim2$s3 , dsim2$s4 ),
+# ps = cbind(dsim2$ps1 , dsim2$ps2 , dsim2$ps3 , dsim2$ps4)  ,
+# id = dsim2$i,
+# bout = dsim2$bout ,
+# N_effects=4
+# )
 
-parlistcombo=c("lambda" ,"a_id" , "mu" ,"Bpay", "fconf", "dev" , "log_lik")
+# parlistcombo=c("lambda" ,"a_id" , "mu" ,"Bpay", "fconf", "dev" , "log_lik")
 
 
-#fit model in stan
-fit_combo <- stan( file = 'PN_social_combo.stan', data = ds , 
-    iter = 2000, warmup=1000, chains=1, cores=1, pars=parlistcombo, 
-    control=list( adapt_delta=0.99 ) )
+# #fit model in stan
+# fit_combo <- stan( file = 'PN_social_combo.stan', data = ds , 
+#     iter = 2000, warmup=1000, chains=1, cores=1, pars=parlistcombo, 
+#     control=list( adapt_delta=0.99 ) )
 
-post <- extract(fit_combo) # extract posterior
+# post <- extract(fit_combo) # extract posterior
 
 ######################################################
 ######check parameters and model predictions##########
