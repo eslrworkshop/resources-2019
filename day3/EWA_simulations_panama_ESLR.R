@@ -46,7 +46,7 @@ techprsucceed <- c(0.511,0.378,0.885,0.665) #probability technique leads to succ
 
 
 #parameter sims
-fc.sim <- log(1)		 #frequency dependecy parameter on log scale
+fc.sim <- log(0.5)		 #frequency dependecy parameter on log scale
 phi.sim <- logit(.15)    ## attraction updating parameter on log-odds scale
 gamma.sim <- logit(.14)  ## influence of social info parameter on log-odds scale
 k.lambda <- 20           ##sensitivity to individual payoffs
