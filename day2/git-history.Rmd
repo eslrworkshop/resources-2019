@@ -1,0 +1,359 @@
+---
+title: ESLR 2019 git workshop
+author: Bret Beheim
+date: 2019-06-13
+---
+
+# Morning Session
+
+First, let's go home (`~`):
+
+```
+cd ~
+pwd
+```
+The `pwd` command ("print working directory") tells me where I am.
+
+```
+git config --global user.name "Bret Beheim"
+git config --global user.email "beheim@gmail.com"
+git config --global core.autocrlf true
+git config --global core.autocrlf input
+git config --global core.editor "nano -w"
+git config --global core.autocrlf true  # for windows
+git config --global core.autocrlf input # for mac/linux
+```
+
+You can look up the options of a command by adding a `-h` flag, e.g. 
+
+```
+git config -h
+```
+
+will show you options.
+
+Let's create a folder to store our simulation project.
+
+```
+mkdir rogers
+cd rogers
+```
+
+We can confirm we are in the right place with `pwd` once again.
+
+Try seeing the status of this repository:
+
+```
+git status
+```
+
+We get an error message - this isn't yet a repository!
+
+```
+git init
+git status
+```
+
+Now we've initalized a repository and can start making commits. We can see the invisible `.git` folder via
+
+
+```
+ls -a
+```
+
+First, let's create a readme file using the nano text editor.
+
+```
+nano README.md   # create this file, and put some information into it 
+```
+
+Add some information about this project, and save it. Now we can see the unstaged files and add them to the stage by `git add`.
+
+```
+git status
+git add README.md
+git status
+```
+
+With our file ready for commit, we do so with `git commit`, adding a commit message to go in the version history.
+
+```
+git commit -m "first commit of my awesome new project"
+```
+
+Having made a commit, let's modify the README.md file and see what git says.
+
+```
+nano README.md # added a new line here
+git status
+```
+
+The file has been modified, and git sees this as untracked changes.
+
+```
+git add README.md
+git status
+```
+
+Once again changes have been staged and are ready to commit.
+
+Question from the group: what happens if there's a further change made to a file while it's staged? Let's find out:
+
+```
+nano README.md  # even more changes made
+git status
+
+```
+
+We see two versions! One is in the stage, and one is in the working directory with the new changes! So, be careful to keep the stage and the working directory clear in your mind as different things. I will undo those new edits and go back to the version in the stage now.
+
+```
+nano README.md  # undo even more changes I just made
+```
+
+Now we only see the copy of README.md in the stage.
+
+```
+git status
+git commit -m "updated my README.md with location"
+```
+
+We can see our old commits with
+
+```
+git log
+```
+
+That's all for the morning session!
+
+
+
+# Afternoon Session
+
+First, we'll recap our work so far by creating a new directory with a short biography about ourselves.
+
+```
+pwd
+cd ..
+mkdir bio
+cd bio
+git init
+nano me.txt  # add some lines
+git status
+git add me.txt
+git commit -m "first commit of my autobiography"
+```
+
+Now make a change to the file, and inspect the different version with the last commit.
+
+```
+nano me.txt
+git status
+git diff me.txt
+```
+
+See that diff only looks at the last commit, unless you explicitly says to compare against the stage.
+
+```
+git add me.txt
+git status
+git diff me.txt  # can't see the stage
+git diff --staged me.txt  # can see the stage
+```
+
+Ok, back to our Rogers' Paradox project.
+
+```
+cd ~/rogers
+```
+
+We can look through the last N commits by adding -N as a flag.
+
+```
+git log -5
+```
+
+Another useful argument is
+
+```
+git log --oneline
+```
+Now, let's go to github and download the two R files from yesterday: github.com/eslrworkshop/resources-2019. We can add those both at the same time using an asterix (*).
+
+```
+git add *.R
+git status
+git commit -m "added simulation R scripts from day1"
+```
+
+We can refer to different commits relative to HEAD (the last commit on this branch), or by it's hash identifier, e.g. when using diff.
+
+```
+git diff README.md
+git diff HEAD README.md
+git diff HEAD~1 README.md
+git diff HEAD~2 README.md
+git diff 2fe9774f5b2d4e81ab01f08a00a8cee7f012a416 README.md
+git diff 2fe977 README.md
+```
+
+We can "check out" the version of a file from any particular commit by `git checkout <commit> <file>`, e.g.
+
+```
+git checkout HEAD~2 README.md
+git status
+nano README.md
+```
+
+It's the version from the first commit! To revert back to the modern verson of the file, we use
+
+```
+git checkout HEAD readme.md  # woops, typo! file names are case-sensitive
+git checkout HEAD README.md
+```
+
+Cristina's question: what happens if you check out a version of a file, when it already has unstaged changes in the working directory? Let's see:
+
+```
+git status
+nano README.md # some new changes here
+git diff
+git status
+git checkout HEAD~2 README.md
+git status
+nano README.md
+```
+
+The unstaged changes have been lost! So, be careful!
+
+Now we use the touch command in Bash to create some dummy files to ignore.
+
+```
+touch fig1.png
+touch output.RData
+git status
+```
+
+Git sees two new files that are unstaged. Let's pretend we don't want to store these kinds of files. We need to put that into `.gitignore`.
+
+```
+nano .gitignore
+```
+
+Inside the .gitignore file, we want to tell it to ignore all png and RData files. We could type:
+
+```
+*.png
+*.RData
+```
+
+Now exit nano and save this text file. Git will now be unable to track these files at all, but it sees the new .gitignore file. We can add the .gitignore and commit that too.
+
+```
+git status
+git add .gitignore
+git commit -m "added a .gitignore to ignore figures and RData files"
+```
+
+Now let's create a `results/` folder, put some results there, but tell git to ignore those too.
+
+```
+mkdir results
+touch results/my_results_simple.csv
+touch results/my_results_conformist.csv
+nano .gitignore
+```
+
+What do we write here? Add this line to the .gitignore:
+
+```
+results/
+```
+
+That should ignore anything inside the results folder. Despite adding these files, check `git status` and it will only see the update to .gitignore. Note we cannot add files that are ignored, unless we use a special flag to force it.
+
+```
+git add fig1.png
+git add --force fig1.png
+```
+
+Let's talk briefly about undoing additions to the stage. This is accomplished by `git reset`.
+
+```
+git status
+git reset fig1.png
+git status
+```
+
+Now fig1.png is unstaged (and ignored again!). We can see ignored files with
+
+```
+git status --ignored
+```
+
+Now let's make a mistake in our code.
+
+```
+nano Sim_Basic_SL.R  # break the code somehow
+```
+
+We can see the difference, but we are going to commit it anyway, to simulate a commit we don't want.
+
+```
+git diff Sim_Basic_SL.R
+git add Sim_Basic_SL.R
+git status
+git commit -m "an unfortunate commit"
+````
+
+How to we roll back to a previous version?
+
+```
+git checkout HEAD~1 Sim_Basic_SL.R
+git status
+```
+
+```
+git diff Sim_Basic_SL.R
+nano Sim_Basic_SL.R  # confirm the code has been repaired
+git commit -m "fixed the broken code from previous commit"
+```
+
+Ok, now let's start working with a remote copy of this repository on github. We go to github.com, log in, create a new repository, and then add these lines to local copy of the repository in the Bash shell.
+
+```
+git remote add origin https://github.com/babeheim/rogers.git
+```
+
+This creates the connection between the two, which we can see with `git remote -v`.
+
+```
+git remote -v
+```
+
+The command to send your local copy to the remote URL is by
+
+```
+git push -u origin master
+```
+
+The name 'origin' was added when we typed `git remote` above, but it really could be anything. The `master` refers to the name of the default branch of the commit history we are on. We don't cover multiple branches today, but itf it comes up, we'd need to use different names for each one, beyond `master`.
+
+If we want to update our local repository from the remote.
+
+```
+git pull origin master
+```
+
+Finally, to copy an entire repository down, use `git clone <URL of repository>`. But don't do that here, because it will put a repository inside another repository, which is chaos! So first let's go somewhere else, and clone in the ELSR workshop material
+
+```
+cd ~/Desktop
+git clone https://github.com/eslrworkshop/resources-2019
+```
+
+That's it! More at
+
+- happygitwithr.com
+- atlassian.com/git
+- swcarpentry.github.io/git-novice/
